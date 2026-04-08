@@ -11,9 +11,9 @@ spec:
     metadata:
       labels:
         app: Pleiades
-  spec:
-    containers:
-      - name: Pleiades
-        image: vardhanyash/pleiades:latest
-        ports:
-          - containerPort: 5000
+    spec:
+      containers:
+        - name: Pleiades
+          image: vardhanyash/pleiades:latest
+          ports:
+            - containerPort: 5000
