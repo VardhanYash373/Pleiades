@@ -19,4 +19,17 @@ jobs:
         with:
           context: ./app
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/pleiades:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/pleiades:latest
+            ${{ secrets.DOCKER_USERNAME }}/pleiades:${{ github.sha }}
+      
+      - name: Update deployment image tag
+        run: |
+          sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/pleiades:.*|image: ${{ secrets.DOCKER_USERNAME }}/pleiades:${{ github.sha }}|" k8s/deployment.yml
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add k8s/deployment.yml
+          git commit -m "ci: update image tag to ${{ github.sha }}"
+          git push
+
+      
