@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: pleiades
-          image: vardhanyash/pleiades:d65859573bdf7ca8c9f6e310944eeddf44cde89f
+          image: vardhanyash/pleiades:8bbd6be687302ce5c1ab6bb17514677b834bac75
           ports:
             - containerPort: 5000
