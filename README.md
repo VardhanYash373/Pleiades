@@ -93,7 +93,7 @@ Pleiades/
 ![GitHub Actions green workflow](screenshots/01-actions-workflow.png)
 
 ### GitHub Actions — Image Tag Update Step
-![Update image tag step expanded](screenshots/02-actions-tag-update.png)
+![Update image tag step expanded](screenshots/02-actions-tags-update.png)
 
 ### Docker Hub — SHA-tagged Images
 ![Docker Hub with commit SHA tags](screenshots/03-dockerhub-tags.png)
@@ -104,16 +104,20 @@ Pleiades/
 ### ArgoCD — Resource Tree
 ![ArgoCD resource tree](screenshots/05-argocd-tree.png)
 
+### ArgoCD — IP and Port Exposure
+![ArgoCD IP and NodePort configuration](screenshots/06-IP-and-Port-argoCD.png)
+
 ### Kubernetes — Pods Running
-![kubectl pods Running](screenshots/06-kubectl-pods.png)
+![kubectl pods Running](screenshots/07-kubectl-pods.png)
 
 ### AWS EC2 — Instance Console
-![EC2 instance on AWS console](screenshots/07-ec2-instance.png)
+![EC2 instance on AWS console](screenshots/08-ec2-instance.png)
 
-### Flask App — Live Response
-![Flask app responding](screenshots/08-flask-response.png)
+### Flask App — Terminal Response
+![Flask app responding in terminal](screenshots/09-flask-response.png)
 
----
+### Flask App — Browser Response
+![Flask app responding in browser](screenshots/10-flask-response-onbrowser.png)
 
 ## Key Engineering Decisions
 
