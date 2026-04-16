@@ -93,7 +93,7 @@ Pleiades/
 ![GitHub Actions green workflow](docs/screenshots/01-actions-workflow.png)
 
 ### GitHub Actions — Image Tag Update Step
-![Update image tag step expanded]((docs/screenshots/02-actions-tags-update.png)
+![Update image tag step expanded](docs/screenshots/02-actions-tags-update.png)
 
 ### Docker Hub — SHA-tagged Images
 ![Docker Hub with commit SHA tags](docs/screenshots/03-dockerhub-tags.png)
