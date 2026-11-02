@@ -1,0 +1,15 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pleiades
+  labels:
+    app: pleiades
+spec:
+  selector:
+    matchLabels:
+      app: pleiades
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
