@@ -15,48 +15,18 @@ resource "aws_key_pair" "pleiades" {
 }
 resource "aws_security_group" "pleiades" {
   name        = "pleiades-sg"
-  description = "Allow SSH and HTTP"
+  description = "SSH, k8s API and NodePorts"
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 5000
-    to_port     = 5000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip]
   }
   ingress {
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 8443
-    to_port     = 8443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 31702
-    to_port     = 31702
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip]
   }
   ingress {
     from_port   = 30000
@@ -76,6 +46,10 @@ resource "aws_instance" "pleiades" {
   instance_type          = var.instance_type
   key_name               = aws_key_pair.pleiades.key_name
   vpc_security_group_ids = [aws_security_group.pleiades.id]
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
   tags = {
     Name = "Pleiades"
   }
