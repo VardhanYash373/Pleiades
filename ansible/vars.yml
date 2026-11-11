@@ -1,0 +1,45 @@
+home_dir: /home/ubuntu
+kubeconfig: /home/ubuntu/.kube/config
+records_file: /home/ubuntu/timedRecords.txt
+timer_script: /home/ubuntu/timer.sh
+
+swap_enabled: false
+swap_size: 2G
+
+packages:
+  - curl
+  - git
+  - python3
+  - jq
+  - ca-certificates
+
+argocd_manifest_url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+application_url: https://raw.githubusercontent.com/VardhanYash373/Pleiades/main/application.yml
+
+monitoring_namespace: monitoring
+monitoring_release: monitoring
+monitoring_values:
+  alertmanager:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  prometheus:
+    prometheusSpec:
+      serviceMonitorSelectorNilUsesHelmValues: false
+      retention: 2d
+      resources:
+        requests:
+          memory: 256Mi
+        limits:
+          memory: 768Mi
+
+wait_after_k3s: 60
+wait_after_monitoring: 120
+wait_after_argocd: 90
+wait_after_app: 60

@@ -1,0 +1,287 @@
+- name: Pleiades EC2 setup
+  hosts: pleiades
+  vars_files:
+    - vars.yml
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+    - name: Install timer helpers
+      ansible.builtin.copy:
+        dest: "{{ timer_script }}"
+        mode: "0644"
+        content: |
+          RECORDS="{{ records_file }}"
+
+          timed() {
+            title="$1"
+            shift
+            s=$(date +%s.%N)
+            r=0
+            "$@" || r=$?
+            e=$(date +%s.%N)
+            now=$(date '+%F %T')
+            awk -v n="$now" -v t="$title" -v s="$s" -v e="$e" -v r="$r" 'BEGIN{printf "%s | %s | %.1fs | exit %d\n", n, t, e-s, r}' >> "$RECORDS"
+            return $r
+          }
+
+          note() {
+            now=$(date '+%F %T')
+            echo "$now | $1 | $2" >> "$RECORDS"
+          }
+
+          memnote() {
+            now=$(date '+%F %T')
+            free -m | awk -v n="$now" -v t="$1" 'NR==2{printf "%s | %s | mem_used_MB %s of %s\n", n, t, $3, $2}' >> "$RECORDS"
+          }
+
+          wait_node() {
+            for i in $(seq 1 60); do
+              kubectl get nodes --no-headers 2>/dev/null | grep -q . && break
+              sleep 2
+            done
+            kubectl wait --for=condition=Ready node --all --timeout=180s
+          }
+
+          wait_synced() {
+            kubectl apply -f "$1"
+            for i in $(seq 1 600); do
+              st=$(kubectl get application pleiades -n argocd -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
+              [ "$st" = "Synced/Healthy" ] && return 0
+              sleep 1
+            done
+            return 1
+          }
+
+          prom_targets() {
+            kubectl get --raw "/api/v1/namespaces/{{ monitoring_namespace }}/services/{{ monitoring_release }}-kube-prometheus-prometheus:9090/proxy/api/v1/targets" | python3 -c 'import sys,json; d=json.load(sys.stdin)["data"]["activeTargets"]; print(len(d),"targets,",sum(t["health"]=="up" for t in d),"up")'
+          }
+
+          app_metrics() {
+            curl -s "localhost:$1/metrics" | grep -c '^# TYPE'
+          }
+
+          pod_recovery() {
+            P=$(kubectl get pod -l app=pleiades -o name | head -1)
+            kubectl delete $P --wait=false
+            sleep 1
+            until [ "$(kubectl get deploy pleiades -o jsonpath='{.status.readyReplicas}')" = "2" ]; do sleep 0.2; done
+          }
+
+          rolling_restart() {
+            NP=$(kubectl get svc pleiades -o jsonpath='{.spec.ports[0].nodePort}')
+            rm -f /tmp/codes.txt
+            ( while true; do curl -s -o /dev/null -w '%{http_code}\n' --max-time 2 localhost:$NP/health; sleep 0.05; done >> /tmp/codes.txt ) &
+            LP=$!
+            r=0
+            kubectl rollout restart deploy/pleiades && kubectl rollout status deploy/pleiades || r=$?
+            kill $LP 2>/dev/null || true
+            sort /tmp/codes.txt | uniq -c
+            return $r
+          }
+
+          scale_out() {
+            r=0
+            kubectl scale deploy/pleiades --replicas=5 && kubectl rollout status deploy/pleiades || r=$?
+            kubectl scale deploy/pleiades --replicas=2
+            return $r
+          }
+
+          snapshot() {
+            {
+              echo "--- final snapshot $(date '+%F %T') ---"
+              kubectl top pods -A --sort-by=memory | head -15
+              kubectl top nodes
+            } >> "$RECORDS"
+            memnote "final steady state"
+          }
+
+    - name: Initialise records file
+      ansible.builtin.copy:
+        dest: "{{ records_file }}"
+        content: "Pleiades EC2 setup timings (date time | step | elapsed | exit)\n"
+        mode: "0644"
+        force: false
+
+    - name: Base packages
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "apt update and base packages" sudo bash -c 'apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y {{ packages | join(" ") }}'
+
+    - name: Swap file
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "create {{ swap_size }} swap file" sudo bash -c 'fallocate -l {{ swap_size }} /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && (grep -q "^/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab)'
+      args:
+        creates: /swapfile
+      when: swap_enabled
+
+    - name: Install k3s
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "install k3s" bash -c 'curl -sfL https://get.k3s.io | sh -'
+      args:
+        creates: /usr/local/bin/k3s
+      async: 600
+      poll: 10
+
+    - name: Wait for k3s kubeconfig
+      ansible.builtin.wait_for:
+        path: /etc/rancher/k3s/k3s.yaml
+        timeout: 120
+      become: true
+
+    - name: Kubeconfig for ubuntu
+      ansible.builtin.shell: |
+        set -e
+        mkdir -p ~/.kube
+        sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+        sudo chown "$(id -un)" ~/.kube/config
+        chmod 600 ~/.kube/config
+      args:
+        creates: "{{ kubeconfig }}"
+
+    - name: Install helm
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "install helm" bash -c 'curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash'
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Wait for node Ready
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "wait for node Ready" wait_node
+        memnote "idle after k3s and helm"
+
+    - name: Settle after k3s
+      ansible.builtin.wait_for:
+        timeout: "{{ wait_after_k3s }}"
+
+    - name: Monitoring values file
+      ansible.builtin.copy:
+        dest: "{{ home_dir }}/monitoring-values.yml"
+        content: "{{ monitoring_values | to_nice_yaml }}"
+        mode: "0644"
+
+    - name: Add prometheus-community repo
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "helm repo add and update" bash -c 'helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update && helm repo update'
+
+    - name: Install kube-prometheus-stack
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "helm install kube-prometheus-stack (to ready)" helm upgrade --install {{ monitoring_release }} prometheus-community/kube-prometheus-stack -n {{ monitoring_namespace }} --create-namespace --wait --timeout 10m -f {{ home_dir }}/monitoring-values.yml
+        memnote "after monitoring stack"
+      async: 900
+      poll: 10
+
+    - name: Settle after monitoring
+      ansible.builtin.wait_for:
+        timeout: "{{ wait_after_monitoring }}"
+
+    - name: Create argocd namespace
+      ansible.builtin.shell: |
+        set -e
+        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Install ArgoCD
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "apply ArgoCD manifest" kubectl apply -n argocd --server-side --force-conflicts -f {{ argocd_manifest_url }}
+        sleep 5
+        timed "wait for ArgoCD pods Ready" kubectl wait --for=condition=Ready pod --all -n argocd --timeout=600s
+        timed "patch argocd-server to NodePort" kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
+        note "argocd NodePort (http)" "$(kubectl get svc argocd-server -n argocd -o jsonpath='{.spec.ports[0].nodePort}')"
+        memnote "after ArgoCD"
+      async: 900
+      poll: 10
+
+    - name: Settle after ArgoCD
+      ansible.builtin.wait_for:
+        timeout: "{{ wait_after_argocd }}"
+
+    - name: Apply Pleiades application
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "apply Application to Synced/Healthy" wait_synced {{ application_url }}
+        memnote "after Pleiades sync"
+      async: 900
+      poll: 10
+
+    - name: Settle after app sync
+      ansible.builtin.wait_for:
+        timeout: "{{ wait_after_app }}"
+
+    - name: Verify scrape and access
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        NP=$(kubectl get svc pleiades -o jsonpath='{.spec.ports[0].nodePort}')
+        note "pleiades NodePort" "$NP"
+        note "prometheus targets" "$(timed "query prometheus targets" prom_targets)"
+        note "pleiades metric families" "$(timed "scrape pleiades /metrics" app_metrics "$NP")"
+        kubectl get pods,svc,servicemonitor
+        echo "grafana admin password:"
+        kubectl get secret -n {{ monitoring_namespace }} {{ monitoring_release }}-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+        echo
+      register: verify
+      changed_when: false
+
+    - name: Show verification
+      ansible.builtin.debug:
+        msg: "{{ verify.stdout_lines }}"
+
+    - name: Pod self-heal time
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "pod self-heal (delete one pod to 2 ready)" pod_recovery
+      tags: [never, resilience]
+
+    - name: Rolling update downtime
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "rollout restart (zero-downtime check)" rolling_restart
+      register: rolling
+      tags: [never, resilience]
+
+    - name: Show rolling update status codes
+      ansible.builtin.debug:
+        msg: "{{ rolling.stdout_lines }}"
+      tags: [never, resilience]
+
+    - name: Scale out time
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        timed "scale 2 to 5 replicas to rolled out" scale_out
+      tags: [never, resilience]
+
+    - name: Final snapshot
+      ansible.builtin.shell: |
+        set -e
+        . {{ timer_script }}
+        snapshot
+      tags: [never, snapshot]
+
+    - name: Read timing records
+      ansible.builtin.command: cat {{ records_file }}
+      register: records
+      changed_when: false
+      tags: [always]
+
+    - name: Show timing records
+      ansible.builtin.debug:
+        msg: "{{ records.stdout_lines }}"
+      tags: [always]
