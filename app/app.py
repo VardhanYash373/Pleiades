@@ -29,7 +29,7 @@ PAGE = """<!doctype html>
 </head>
 <body>
 <canvas id="sky"></canvas>
-<div class="stage"><div class="zoomable" id="zoomable"><h1>hello from Pleiades! GitOps is live! from VardhanYash373 :3 v2</h1></div></div>
+<div class="stage"><div class="zoomable" id="zoomable"><h1>hello from Pleiades! GitOps is live! from VardhanYash373 :3 v3</h1></div></div>
 <div class="controls">
   <button id="out" aria-label="Zoom out">&minus;</button>
   <span id="level">100%</span>
