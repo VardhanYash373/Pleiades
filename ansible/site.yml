@@ -43,7 +43,7 @@
           }
 
           wait_synced() {
-            kubectl apply -f "$1"
+            kubectl apply -f "$1" || return 1
             for i in $(seq 1 600); do
               st=$(kubectl get application pleiades -n argocd -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
               [ "$st" = "Synced/Healthy" ] && return 0

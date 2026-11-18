@@ -14,7 +14,7 @@ packages:
   - ca-certificates
 
 argocd_manifest_url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-application_url: https://raw.githubusercontent.com/VardhanYash373/Pleiades/main/application.yml
+application_url: https://raw.githubusercontent.com/VardhanYash373/Pleiades/main/argocd/application.yml
 
 monitoring_namespace: monitoring
 monitoring_release: monitoring

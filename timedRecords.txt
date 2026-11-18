@@ -1,0 +1,33 @@
+Pleiades EC2 setup timings (date time | step | elapsed | exit)
+2026-11-11 23:13:04 | apt update and base packages | 27.6s | exit 0
+2026-11-11 23:13:27 | install k3s | 19.5s | exit 0
+2026-11-11 23:13:43 | install helm | 2.4s | exit 0
+2026-11-11 23:13:47 | wait for node Ready | 0.6s | exit 0
+2026-11-11 23:13:47 | idle after k3s and helm | mem_used_MB 959 of 3836
+2026-11-11 23:14:59 | helm repo add and update | 2.1s | exit 0
+2026-11-11 23:16:51 | helm install kube-prometheus-stack (to ready) | 108.6s | exit 0
+2026-11-11 23:16:51 | after monitoring stack | mem_used_MB 2382 of 3836
+2026-11-11 23:19:11 | apply ArgoCD manifest | 7.6s | exit 0
+2026-11-11 23:20:00 | wait for ArgoCD pods Ready | 44.4s | exit 0
+2026-11-11 23:20:00 | patch argocd-server to NodePort | 0.2s | exit 0
+2026-11-11 23:20:01 | argocd NodePort (http) | 30795
+2026-11-11 23:20:01 | after ArgoCD | mem_used_MB 2708 of 3836
+2026-11-11 23:33:17 | apply Application to Synced/Healthy | 695.0s | exit 1
+2026-11-11 23:45:25 | apt update and base packages | 10.4s | exit 0
+2026-11-11 23:45:55 | wait for node Ready | 1.4s | exit 0
+2026-11-11 23:45:55 | idle after k3s and helm | mem_used_MB 2705 of 3836
+2026-11-11 23:47:08 | helm repo add and update | 2.9s | exit 0
+2026-11-11 23:48:04 | helm install kube-prometheus-stack (to ready) | 52.2s | exit 0
+2026-11-11 23:48:04 | after monitoring stack | mem_used_MB 2809 of 3836
+2026-11-11 23:50:29 | apply ArgoCD manifest | 3.5s | exit 0
+2026-11-11 23:50:35 | wait for ArgoCD pods Ready | 0.9s | exit 0
+2026-11-11 23:50:36 | patch argocd-server to NodePort | 0.2s | exit 0
+2026-11-11 23:50:36 | argocd NodePort (http) | 30795
+2026-11-11 23:50:36 | after ArgoCD | mem_used_MB 2843 of 3836
+2026-11-11 23:52:42 | apply Application to Synced/Healthy | 25.4s | exit 0
+2026-11-11 23:52:42 | after Pleiades sync | mem_used_MB 3151 of 3836
+2026-11-11 23:54:01 | pleiades NodePort | 30897
+2026-11-11 23:54:02 | query prometheus targets | 0.3s | exit 0
+2026-11-11 23:54:02 | prometheus targets | 13 targets, 13 up
+2026-11-11 23:54:02 | scrape pleiades /metrics | 0.1s | exit 0
+2026-11-11 23:54:02 | pleiades metric families | 16
